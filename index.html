@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - All Courier Support</title>
+    <title>Urai Resi PDF - V3 (GTL & Ninja Fix)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -27,13 +27,15 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.5); }
+        .animate-fade-in { animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-100 text-slate-800 font-sans">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
         // --- ICONS ---
         const Icon = ({ path, className, spin }) => (
@@ -53,26 +55,29 @@
             Package: <><path d="m16.5 9.4-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
             X: <path d="M18 6 6 18M6 6l12 12"/>,
             Layers: <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
-            Info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>
+            Truck: <><rect width="16" height="13" x="2" y="5" rx="2"/><path d="M16 5h2.586a1 1 0 0 1 .707.293l3.414 3.414a1 1 0 0 1 .293.707V15a2 2 0 0 1-2 2h-2"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>
         };
 
         // --- MODAL COMPONENT ---
         const Modal = ({ isOpen, onClose, title, children }) => {
             if (!isOpen) return null;
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-                            <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors">
-                                <div className="w-6 h-6"><Icon path={Icons.X} className="w-full h-full" /></div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in ring-1 ring-slate-900/5">
+                        <div className="flex justify-between items-center p-4 border-b bg-slate-50 rounded-t-xl">
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <div className="p-1 bg-white rounded-md shadow-sm"><Icon path={Icons.Layers} className="w-4 h-4 text-orange-500"/></div>
+                                {title}
+                            </h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors p-1 hover:bg-red-50 rounded-full">
+                                <div className="w-5 h-5"><Icon path={Icons.X} className="w-full h-full" /></div>
                             </button>
                         </div>
-                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1 bg-white">
                             {children}
                         </div>
-                        <div className="p-4 border-t bg-slate-50 text-right rounded-b-lg">
-                            <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium transition-colors">Tutup</button>
+                        <div className="p-4 border-t bg-slate-50 text-right rounded-b-xl">
+                            <button onClick={onClose} className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors shadow-sm text-sm">Tutup</button>
                         </div>
                     </div>
                 </div>
@@ -91,7 +96,7 @@
             const [errorMsg, setErrorMsg] = useState('');
             
             // State untuk statistik
-            const [stats, setStats] = useState({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+            const [stats, setStats] = useState({ totalPages: 0, processedPages: 0, emptyPages: 0, gtlCount: 0, ninjaCount: 0 });
             
             // State Modal
             const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
@@ -102,7 +107,7 @@
                 if (validFiles.length > 0) {
                     setPdfFiles(prev => [...prev, ...validFiles]);
                     setExtractedData([]); setDuplicateData([]); setLogs([]); setErrorMsg('');
-                    setStats({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+                    setStats({ totalPages: 0, processedPages: 0, emptyPages: 0, gtlCount: 0, ninjaCount: 0 });
                 } else {
                     setErrorMsg('Mohon upload file format PDF.');
                 }
@@ -111,42 +116,31 @@
             const removeFile = (index) => setPdfFiles(prev => prev.filter((_, i) => i !== index));
             const clearAllFiles = () => { 
                 setPdfFiles([]); setExtractedData([]); setDuplicateData([]); setLogs([]); 
-                setStats({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+                setStats({ totalPages: 0, processedPages: 0, emptyPages: 0, gtlCount: 0, ninjaCount: 0 });
             };
 
+            // --- LOGIC PEMBERSIHAN STRING RESI ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
+                // PENTING: Hapus semua spasi agar konsisten
                 let clean = resi.replace(/\s+/g, '').trim().toUpperCase();
 
-                // 1. KHUSUS LION PARCEL
-                if (provider === 'Lion Parcel' || clean.startsWith('C1')) {
-                    const lionMatch = clean.match(/^C1[A-Z0-9]{6}/);
-                    if (lionMatch) return lionMatch[0];
-                    if (clean.startsWith('C1') && clean.length >= 8) return clean.substring(0, 8);
+                // VALIDASI KHUSUS
+                if (provider === 'Lion Parcel' && clean.startsWith('C1')) {
+                    return clean.substring(0, 8); // Ambil C1 + 6 digit
                 }
 
-                // 2. Cek Duplikat (Mirroring)
-                if (clean.length >= 10 && clean.length % 2 === 0) {
-                    const mid = clean.length / 2;
-                    if (clean.slice(0, mid) === clean.slice(mid)) {
-                        clean = clean.slice(0, mid);
-                    }
+                if (clean.startsWith('NJV')) {
+                    // Ninja kadang nempel dengan teks lain di PDF, kita batasi panjangnya
+                    if(clean.length > 18) return clean.substring(0, 18);
+                    return clean;
                 }
 
-                // 3. J&T
-                if (provider === 'J&T Express' || /^(JO|JX|JP|EZ|JS|JT)/.test(clean)) {
-                    const match = clean.match(/^(JO|JX|JP|EZ|JS|JT)[0-9]{10,12}/);
-                    if (match) clean = match[0];
+                // GTL biasanya 13-15 karakter (GTL + angka)
+                if (clean.startsWith('GTL')) {
+                    if(clean.length > 15) return clean.substring(0, 15);
+                    return clean;
                 }
-
-                // 4. ID Express
-                if (provider === 'ID Express' || clean.startsWith('IDE')) {
-                    const match = clean.match(/^(IDE|IDS)[0-9]{10,15}/);
-                    if (match) clean = match[0];
-                }
-
-                // 5. Validasi Panjang
-                if (clean.length < 6 || clean.length > 30) return null;
 
                 return clean;
             };
@@ -158,13 +152,14 @@
                 setExtractedData([]);
                 setDuplicateData([]);
                 
-                // Penampung Sementara
                 let tempUniqueResis = [];
                 let tempDuplicateResis = [];
-                let globalSeenResis = new Set(); // Untuk tracking global
+                let globalSeenResis = new Set();
 
                 let totalPageCount = 0;
                 let pagesWithResiCount = 0;
+                let countGTL = 0;
+                let countNinja = 0;
 
                 try {
                     for (let fIndex = 0; fIndex < pdfFiles.length; fIndex++) {
@@ -180,109 +175,64 @@
                             for (let i = 1; i <= totalPages; i++) {
                                 const page = await pdf.getPage(i);
                                 const textContent = await page.getTextContent();
-                                const pageText = textContent.items.map(item => item.str).join(' ');
                                 
-                                if (pageText.trim().length < 10) continue;
+                                // --- METODE V3 (Anti Spasi) ---
+                                // 1. Ambil teks mentah
+                                const rawText = textContent.items.map(item => item.str).join(' ');
+                                // 2. PADATKAN TEKS (Hapus semua spasi)
+                                // Ini mengatasi masalah "G T L 7 0..." yang terbaca terpisah
+                                const compactedText = rawText.replace(/\s+/g, '');
+                                
+                                if (compactedText.length < 10) continue;
 
-                                let pageResisRaw = []; // Resi mentah per halaman (sebelum cek global)
-                                const isKiriminAja = /kiriminaja/i.test(pageText);
+                                let pageResisRaw = [];
 
-                                if (isKiriminAja) {
-                                    let subCourier = 'KiriminAja'; 
-                                    if (/POS\s*IND|POS\s*INDONESIA/i.test(pageText)) subCourier = 'POS Indonesia';
-                                    else if (/LION\s*PARCEL/i.test(pageText)) subCourier = 'Lion Parcel';
-                                    else if (/\bJNE\b/i.test(pageText)) subCourier = 'JNE';
-                                    else if (/\bNINJA\b/i.test(pageText)) subCourier = 'Ninja Van';
-                                    else if (/J&T/i.test(pageText)) subCourier = 'J&T Express';
-                                    else if (/ID\s*EXPRESS/i.test(pageText)) subCourier = 'ID Express';
-                                    else if (/SICEPAT/i.test(pageText)) subCourier = 'SiCepat';
-                                    else if (/SAP/i.test(pageText)) subCourier = 'SAP Express';
-                                    else if (/ANTERAJA/i.test(pageText)) subCourier = 'Anteraja';
-
-                                    const awbMatch = pageText.match(/AWB\s*[:.-]?\s*([A-Z0-9-]+(?:\s+[A-Z0-9-]+)*)/i);
-                                    if (awbMatch && awbMatch[1]) {
-                                        let rawString = awbMatch[1];
-                                        const cutOffRegex = /(OID|No\.|Trx|Tgl|Pengirim|Penerima|COD|Rp|Total|Qty)/i;
-                                        const cutIndex = rawString.search(cutOffRegex);
-                                        if (cutIndex !== -1) rawString = rawString.substring(0, cutIndex);
-
-                                        let finalResi = cleanResiString(rawString, subCourier);
-                                        if (finalResi) pageResisRaw.push({ resi: finalResi, type: subCourier, fileName: file.name, page: i });
-                                    }
-                                    
-                                    const ninjaKAMatch = pageText.match(/\b(KRMJAOID)\s*[-]?\s*([0-9]+)\b/i);
-                                    if (ninjaKAMatch) {
-                                         const fullResi = `${ninjaKAMatch[1]}-${ninjaKAMatch[2]}`;
-                                         // Cek lokal page agar tidak double dari AWB match
-                                         if (!pageResisRaw.some(r => r.resi === fullResi)) {
-                                            pageResisRaw.push({ resi: fullResi, type: 'Ninja Van', fileName: file.name, page: i });
-                                         }
-                                    }
-                                }
-
+                                // --- POLA REGEX PADA TEKS PADAT ---
                                 const standardPatterns = [
-                                    { regex: /\b(JX|JP|JO|EZ|JS|JT)[0-9]{10,15}\b/gi, type: 'J&T Express' },
-                                    { regex: /\bSPXID[A-Z0-9]{10,20}\b/gi, type: 'SPX Express' },
-                                    { regex: /\b(NJV|KRMJAOID)[A-Z0-9-]{10,25}\b/gi, type: 'Ninja Van' },
-                                    { regex: /\bGTL[A-Z0-9]{10,20}\b/gi, type: 'GTL' },
-                                    { regex: /\b(CM|KAJ)[0-9]{10,20}\b/gi, type: 'JNE' },
-                                    { regex: /\b(IDE|IDS)[0-9]{10,20}\b/gi, type: 'ID Express' },
-                                    { regex: /\bOID[0-9]{10,20}\b/gi, type: 'POS Indonesia' },
-                                    { regex: /\bC1[A-Z0-9]{6,10}\b/gi, type: 'Lion Parcel' } 
+                                    // GTL: Cari 'GTL' diikuti 10-15 angka (tanpa spasi di antaranya karena sudah dipadatkan)
+                                    { regex: /GTL[0-9]{10,15}/gi, type: 'GTL' },
+                                    
+                                    // Ninja: NJV diikuti karakter alfanumerik
+                                    { regex: /(NJV|KRMJAOID)[A-Z0-9]{10,20}/gi, type: 'Ninja Van' },
+                                    
+                                    // SPX
+                                    { regex: /SPXID[A-Z0-9]{10,20}/gi, type: 'SPX Express' },
+                                    
+                                    // J&T (JX, JP, JO, dll)
+                                    { regex: /(JX|JP|JO|EZ|JS|JT)[0-9]{10,15}/gi, type: 'J&T Express' },
+                                    
+                                    // JNE
+                                    { regex: /(CM|KAJ)[0-9]{10,20}/gi, type: 'JNE' },
+                                    
+                                    // ID Express
+                                    { regex: /(IDE|IDS)[0-9]{10,20}/gi, type: 'ID Express' },
+                                    
+                                    // Lion Parcel (C1...)
+                                    { regex: /C1[A-Z0-9]{6,10}/gi, type: 'Lion Parcel' } 
                                 ];
 
                                 standardPatterns.forEach(({ regex, type }) => {
-                                    const matches = pageText.match(regex);
+                                    // Kita cari di compactedText (teks tanpa spasi)
+                                    const matches = compactedText.match(regex);
                                     if (matches) {
                                         matches.forEach(resi => {
                                             const finalResi = cleanResiString(resi, type);
                                             if (finalResi) {
-                                                // Cek lokal page
+                                                // Cek apakah resi ini sudah ada di halaman ini
                                                 const exists = pageResisRaw.find(r => r.resi === finalResi);
                                                 if (!exists) {
-                                                    let finalType = type;
-                                                    if (isKiriminAja) {
-                                                        if (type === 'Lion Parcel') finalType = 'Lion Parcel'; 
-                                                        else if (/POS\s*IND/i.test(pageText)) finalType = 'POS Indonesia';
-                                                        else if (/LION/i.test(pageText)) finalType = 'Lion Parcel';
-                                                        else if (/JNE/i.test(pageText)) finalType = 'JNE';
-                                                    }
-                                                    pageResisRaw.push({ resi: finalResi, type: finalType, fileName: file.name, page: i });
+                                                    pageResisRaw.push({ resi: finalResi, type: type, fileName: file.name, page: i });
                                                 }
                                             }
                                         });
                                     }
                                 });
 
-                                // LAZADA
-                                if (!isKiriminAja) {
-                                    const lazadaPattern = /\b(NLID|LXAD|LXRP)[A-Z0-9-]{9,25}\b/gi;
-                                    const matches = pageText.match(lazadaPattern);
-                                    if (matches) {
-                                        matches.forEach(resi => {
-                                            const finalResi = cleanResiString(resi, 'LEX ID');
-                                            if (finalResi) {
-                                                let type = 'LEX ID';
-                                                const headerMatch = pageText.match(/Diserahkan\s*ke[\s\S]{0,50}?(NINJA|LEX)/i);
-                                                if (headerMatch) {
-                                                    if (headerMatch[1].toUpperCase().includes('NINJA')) type = 'Ninja Van';
-                                                } else {
-                                                    if (/NINJA/i.test(pageText) && !/\bLEX\b/i.test(pageText)) type = 'Ninja Van';
-                                                }
-                                                if (!pageResisRaw.find(r => r.resi === finalResi)) {
-                                                    pageResisRaw.push({ resi: finalResi, type: type, fileName: file.name, page: i });
-                                                }
-                                            }
-                                        });
-                                    }
-                                }
-
                                 // --- PEMROSESAN AKHIR HALAMAN ---
                                 if (pageResisRaw.length > 0) {
                                     pagesWithResiCount++;
                                     
-                                    // Filter Duplikat dalam 1 halaman (Ambil yang terpanjang/terbaik jika konflik)
-                                    // Kita gunakan Map untuk deduplikasi lokal
+                                    // Deduplikasi Lokal (per halaman)
                                     let pageUnique = new Map();
                                     pageResisRaw.forEach(item => {
                                         if (!pageUnique.has(item.resi)) {
@@ -290,28 +240,30 @@
                                         }
                                     });
                                     
-                                    // Sekarang Cek ke Global
+                                    // Deduplikasi Global (antar halaman/file)
                                     let foundCount = 0;
                                     pageUnique.forEach((item) => {
                                         if (globalSeenResis.has(item.resi)) {
-                                            // INI DUPLIKAT GLOBAL
                                             tempDuplicateResis.push(item);
                                         } else {
-                                            // INI UNIK
                                             globalSeenResis.add(item.resi);
                                             tempUniqueResis.push(item);
                                             foundCount++;
+                                            
+                                            if (item.type === 'GTL') countGTL++;
+                                            if (item.type === 'Ninja Van') countNinja++;
                                         }
                                     });
 
                                     if (foundCount > 0) {
-                                        setLogs(prev => [...prev, `   ✓ Hal ${i}: Ditemukan ${foundCount} resi baru.`]);
+                                        setLogs(prev => [...prev, `   ✓ Hal ${i}: ${foundCount} resi.`]);
                                     } else {
-                                        setLogs(prev => [...prev, `   ⚠ Hal ${i}: Resi sudah ada sebelumnya (Double).`]);
+                                        setLogs(prev => [...prev, `   ⚠ Hal ${i}: Skip (Double).`]);
                                     }
                                 }
                             }
                         } catch (err) {
+                            console.error(err);
                             setLogs(prev => [...prev, `   ❌ Gagal membaca file: ${file.name}`]);
                         }
                     }
@@ -322,12 +274,15 @@
                     setStats({
                         totalPages: totalPageCount,
                         processedPages: pagesWithResiCount,
-                        emptyPages: totalPageCount - pagesWithResiCount
+                        emptyPages: totalPageCount - pagesWithResiCount,
+                        gtlCount: countGTL,
+                        ninjaCount: countNinja
                     });
 
-                    setLogs(prev => [...prev, `\n✅ Selesai! Total ${tempUniqueResis.length} unik, ${tempDuplicateResis.length} double.`]);
+                    setLogs(prev => [...prev, `\n✅ Selesai! Total ${tempUniqueResis.length} unik.`]);
 
                 } catch (error) {
+                    console.error(error);
                     setErrorMsg("Terjadi kesalahan fatal saat memproses antrian PDF.");
                 } finally {
                     setIsProcessing(false);
@@ -352,141 +307,215 @@
             };
 
             const downloadCSV = () => {
-                const headers = "No;Nomor Resi;Nama File;Halaman;Ekspedisi\n";
+                const headers = "No;Nomor Resi;Ekspedisi;File;Halaman\n";
                 const rows = extractedData.map((item, index) => {
-                    return `${index + 1};${item.resi};"${item.fileName}";${item.page};${item.type}`;
+                    return `${index + 1};${item.resi};${item.type};"${item.fileName}";${item.page}`;
                 }).join('\n');
                 const csvContent = "data:text/csv;charset=utf-8,%EF%BB%BF" + encodeURIComponent(headers + rows);
                 const link = document.createElement("a");
                 link.setAttribute("href", csvContent);
-                link.setAttribute("download", "hasil_urai_resi_batch.csv");
+                link.setAttribute("download", "hasil_urai_resi_v3_fix.csv");
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
             };
 
             return (
-                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
-                    <div className="max-w-4xl mx-auto">
+                <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans text-slate-800">
+                    <div className="max-w-5xl mx-auto">
+                        
+                        {/* HEADER */}
                         <div className="mb-8 text-center">
-                            <h1 className="text-3xl font-bold text-orange-600 mb-2 flex items-center justify-center gap-2">
-                                <Icon path={Icons.Package} className="w-8 h-8" />
-                                Urai Resi PDF
+                            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-800 mb-2 flex items-center justify-center gap-3 tracking-tight">
+                                <div className="bg-orange-100 p-2 rounded-xl text-orange-600"><Icon path={Icons.Package} className="w-8 h-8" /></div>
+                                Urai Resi PDF <span className="text-orange-600">V3 (Final Fix)</span>
                             </h1>
-                            <p className="text-slate-600">Upload <strong>banyak PDF</strong> sekaligus (J&T, SPX, Ninja, JNE, POS, ID Express, KiriminAja, Lion), alat ini akan menggabungkan semua resi.</p>
+                            <p className="text-slate-500 font-medium">Teknologi <span className="font-bold bg-slate-200 px-1 rounded">Compact Text</span> untuk mengatasi spasi PDF GTL/Ninja</p>
                         </div>
 
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
-                            <div className="p-8 bg-slate-50 border-b border-slate-200">
-                                <div className="flex flex-col items-center gap-4">
-                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50 hover:bg-orange-100 transition-colors">
-                                        <div className="w-10 h-10 text-orange-500 mb-2"><Icon path={Icons.Upload} className="w-full h-full" /></div>
-                                        <span className="text-sm text-slate-600 font-medium">Klik untuk tambah file PDF</span>
-                                        <span className="text-xs text-slate-400 mt-1">(Bisa pilih banyak file sekaligus)</span>
+                        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200/60">
+                            
+                            {/* UPLOAD SECTION */}
+                            <div className="p-8 bg-slate-50/50 border-b border-slate-200">
+                                <div className="flex flex-col items-center gap-6">
+                                    <label className="group cursor-pointer flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-orange-300 rounded-2xl bg-orange-50/30 hover:bg-orange-50 hover:border-orange-400 transition-all duration-300 relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-orange-100 opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                                        <div className="w-14 h-14 text-orange-500 mb-3 bg-white p-3 rounded-full shadow-sm group-hover:scale-110 transition-transform"><Icon path={Icons.Upload} className="w-full h-full" /></div>
+                                        <span className="text-base text-slate-700 font-bold">Klik area ini untuk upload PDF</span>
+                                        <span className="text-xs text-slate-400 mt-1 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">Support Batch Upload (Banyak File)</span>
                                         <input type="file" accept="application/pdf" multiple className="hidden" onChange={handleFileChange} />
                                     </label>
                                     
                                     {pdfFiles.length > 0 && (
-                                        <div className="w-full space-y-2 max-h-40 overflow-y-auto custom-scrollbar bg-white p-2 rounded border border-slate-200">
-                                            <div className="flex justify-between items-center px-2 pb-2 border-b border-slate-100">
-                                                <span className="text-xs font-bold text-slate-500">{pdfFiles.length} File Dipilih</span>
-                                                <button onClick={clearAllFiles} className="text-xs text-red-500 hover:underline">Hapus Semua</button>
+                                        <div className="w-full space-y-3 max-h-48 overflow-y-auto custom-scrollbar bg-white p-4 rounded-xl border border-slate-200 shadow-inner">
+                                            <div className="flex justify-between items-center px-1 pb-2 border-b border-slate-100">
+                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{pdfFiles.length} File Antrian</span>
+                                                <button onClick={clearAllFiles} className="text-xs text-red-500 hover:text-red-600 font-medium hover:underline flex items-center gap-1"><Icon path={Icons.Trash2} className="w-3 h-3"/> Hapus Semua</button>
                                             </div>
-                                            {pdfFiles.map((file, idx) => (
-                                                <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
-                                                    <div className="flex items-center gap-2 truncate">
-                                                        <div className="w-4 h-4 text-slate-400"><Icon path={Icons.FileText} className="w-full h-full" /></div>
-                                                        <span className="truncate max-w-[200px]">{file.name}</span>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                {pdfFiles.map((file, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-sm transition-colors group">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center text-slate-400 border border-slate-200 shadow-sm shrink-0 group-hover:text-orange-500 group-hover:border-orange-200 transition-colors"><Icon path={Icons.FileText} className="w-4 h-4" /></div>
+                                                            <span className="truncate font-medium text-slate-600">{file.name}</span>
+                                                        </div>
+                                                        <button onClick={() => removeFile(idx)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><div className="w-4 h-4"><Icon path={Icons.X} className="w-full h-full" /></div></button>
                                                     </div>
-                                                    <button onClick={() => removeFile(idx)} className="text-slate-400 hover:text-red-500 transition-colors"><div className="w-4 h-4"><Icon path={Icons.X} className="w-full h-full" /></div></button>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 
-                                    <button onClick={extractResi} disabled={pdfFiles.length === 0 || isProcessing} className={`w-full py-3 rounded-lg font-bold text-white transition-all flex items-center justify-center gap-2 ${pdfFiles.length === 0 || isProcessing ? 'bg-slate-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 shadow-md hover:shadow-lg'}`}>
-                                        <div className="w-5 h-5"><Icon path={isProcessing ? Icons.Loader2 : Icons.Search} className="w-full h-full" spin={isProcessing} /></div>
-                                        {isProcessing ? `Sedang Mengurai ${pdfFiles.length} File...` : 'Mulai Urai Semua File'}
+                                    <button onClick={extractResi} disabled={pdfFiles.length === 0 || isProcessing} 
+                                        className={`w-full py-4 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-3 text-lg shadow-lg shadow-orange-500/20 ${pdfFiles.length === 0 || isProcessing ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 hover:scale-[1.01] active:scale-[0.99]'}`}>
+                                        <div className="w-6 h-6"><Icon path={isProcessing ? Icons.Loader2 : Icons.Search} className="w-full h-full" spin={isProcessing} /></div>
+                                        {isProcessing ? `Sedang Mengurai ${pdfFiles.length} File PDF...` : 'Mulai Eksekusi'}
                                     </button>
                                 </div>
-                                {errorMsg && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center gap-2 text-sm"><div className="w-4 h-4"><Icon path={Icons.AlertCircle} className="w-full h-full" /></div> {errorMsg}</div>}
+                                {errorMsg && <div className="mt-4 p-4 bg-red-50 border border-red-100 text-red-700 rounded-xl flex items-center gap-3 text-sm animate-fade-in"><div className="w-5 h-5 text-red-500 shrink-0"><Icon path={Icons.AlertCircle} className="w-full h-full" /></div> {errorMsg}</div>}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-                                <div className="p-4 bg-slate-50 md:col-span-1 h-80 overflow-y-auto text-xs font-mono border-b md:border-b-0">
-                                    <h3 className="font-bold text-slate-700 mb-2 sticky top-0 bg-slate-50 pb-1 border-b border-slate-200">Log Proses</h3>
-                                    <ul className="space-y-1">{logs.map((log, idx) => <li key={idx} className={`whitespace-pre-wrap ${log.includes('❌') ? 'text-red-600' : 'text-slate-600'}`}>{log}</li>)}</ul>
+                            {/* RESULTS AREA */}
+                            <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-200 bg-white min-h-[500px]">
+                                
+                                {/* LOGS PANEL (LEFT) */}
+                                <div className="p-4 bg-slate-50/80 md:col-span-4 flex flex-col h-full border-r border-slate-200">
+                                    <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2 text-sm uppercase tracking-wider">
+                                        <Icon path={Icons.Layers} className="w-4 h-4 text-slate-400" /> Log Aktivitas
+                                    </h3>
+                                    <div className="flex-1 bg-white border border-slate-200 rounded-lg p-3 overflow-y-auto custom-scrollbar h-[400px] font-mono text-xs leading-relaxed shadow-inner">
+                                        {logs.length === 0 ? (
+                                            <div className="h-full flex flex-col items-center justify-center text-slate-300 italic gap-2">
+                                                <div className="w-8 h-8 opacity-50"><Icon path={Icons.Loader2} className="w-full h-full"/></div>
+                                                Menunggu proses...
+                                            </div>
+                                        ) : (
+                                            <ul className="space-y-1.5">
+                                                {logs.map((log, idx) => (
+                                                    <li key={idx} className={`break-words ${log.includes('❌') ? 'text-red-600 bg-red-50 p-1 rounded' : log.includes('✓') ? 'text-emerald-600' : log.includes('📂') ? 'font-bold text-slate-800 mt-2 pt-2 border-t border-slate-100' : 'text-slate-500'}`}>
+                                                        {log}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="p-6 md:col-span-2 bg-white min-h-[20rem]">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div><h2 className="text-lg font-bold text-slate-800">Hasil Urai</h2><p className="text-sm text-slate-500">Ditemukan: <span className="font-bold text-orange-600">{extractedData.length}</span> Resi Unik</p></div>
+                                {/* DATA PANEL (RIGHT) */}
+                                <div className="p-6 md:col-span-8 bg-white flex flex-col">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-slate-800">Hasil Ekstraksi</h2>
+                                            <p className="text-sm text-slate-500 mt-1">Total Ditemukan: <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold text-xs border border-orange-200">{extractedData.length} Resi Unik</span></p>
+                                        </div>
                                         {extractedData.length > 0 && (
-                                            <div className="flex gap-2">
-                                                <button onClick={copyToClipboard} className="p-2 text-slate-600 hover:bg-slate-100 rounded border border-slate-300 transition-colors" title="Copy All"><div className="w-4 h-4"><Icon path={Icons.Copy} className="w-full h-full" /></div></button>
-                                                <button onClick={downloadCSV} className="p-2 text-green-600 hover:bg-green-50 rounded border border-green-200 transition-colors" title="Download CSV"><div className="w-4 h-4"><Icon path={Icons.Download} className="w-full h-full" /></div></button>
+                                            <div className="flex gap-3">
+                                                <button onClick={copyToClipboard} className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-800 rounded-lg border border-slate-300 transition-all text-sm font-medium shadow-sm active:scale-95">
+                                                    <div className="w-4 h-4"><Icon path={Icons.Copy} className="w-full h-full" /></div> Salin
+                                                </button>
+                                                <button onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all text-sm font-medium shadow-md shadow-emerald-500/20 active:scale-95">
+                                                    <div className="w-4 h-4"><Icon path={Icons.Download} className="w-full h-full" /></div> Excel/CSV
+                                                </button>
                                             </div>
                                         )}
                                     </div>
 
                                     {extractedData.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50 pb-10"><div className="w-16 h-16 mb-2"><Icon path={Icons.Package} className="w-full h-full" /></div><p>Belum ada data resi</p></div>
+                                        <div className="flex-1 flex flex-col items-center justify-center text-slate-300 opacity-60 pb-10">
+                                            <div className="w-24 h-24 mb-4 bg-slate-50 rounded-full flex items-center justify-center"><Icon path={Icons.Package} className="w-12 h-12 text-slate-300" /></div>
+                                            <p className="font-medium">Belum ada data resi berhasil diurai.</p>
+                                        </div>
                                     ) : (
-                                        <>
-                                            {/* STATISTIK CARD DENGAN KLIK MODAL DOUBLE */}
-                                            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-4">
-                                                <div className="bg-blue-50 p-2 md:p-3 rounded border border-blue-100 text-center">
-                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Upload</div>
-                                                    <div className="text-sm md:text-lg font-bold text-blue-600">{stats.totalPages} Hal</div>
+                                        <div className="flex-1 flex flex-col min-h-0">
+                                            {/* STATISTIK CARD HIGHLIGHT */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                                <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 text-center">
+                                                    <div className="text-xs text-teal-600/70 font-bold uppercase mb-1">GTL</div>
+                                                    <div className="text-2xl font-bold text-teal-700">{stats.gtlCount}</div>
                                                 </div>
-                                                <div className="bg-green-50 p-2 md:p-3 rounded border border-green-100 text-center">
-                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Berhasil</div>
-                                                    <div className="text-sm md:text-lg font-bold text-green-600">{stats.processedPages} Hal</div>
+                                                <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center">
+                                                    <div className="text-xs text-red-600/70 font-bold uppercase mb-1">Ninja Van</div>
+                                                    <div className="text-2xl font-bold text-red-700">{stats.ninjaCount}</div>
                                                 </div>
-                                                <div className="bg-red-50 p-2 md:p-3 rounded border border-red-100 text-center">
-                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Kosong</div>
-                                                    <div className="text-sm md:text-lg font-bold text-red-500">{stats.emptyPages} Hal</div>
+                                                <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
+                                                    <div className="text-xs text-blue-600/70 font-bold uppercase mb-1">Total Scan</div>
+                                                    <div className="text-2xl font-bold text-blue-700">{stats.totalPages} <span className="text-xs font-normal text-blue-500">Hal</span></div>
                                                 </div>
-                                                {/* KOTAK DOUBLE RESI */}
+                                                
                                                 <div 
                                                     onClick={() => duplicateData.length > 0 && setIsDuplicateModalOpen(true)}
-                                                    className={`p-2 md:p-3 rounded border text-center transition-all ${duplicateData.length > 0 ? 'bg-yellow-50 border-yellow-200 cursor-pointer hover:bg-yellow-100 hover:shadow-sm' : 'bg-slate-50 border-slate-100 opacity-50'}`}
+                                                    className={`p-3 rounded-xl border text-center transition-all relative overflow-hidden ${duplicateData.length > 0 ? 'bg-yellow-50 border-yellow-200 cursor-pointer hover:shadow-md hover:-translate-y-0.5 group' : 'bg-slate-50 border-slate-100 opacity-50'}`}
                                                 >
-                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1 flex items-center justify-center gap-1">
-                                                        Double <div className="w-3 h-3"><Icon path={Icons.Layers} className="w-full h-full" /></div>
+                                                    <div className="text-xs text-yellow-600/70 font-bold uppercase mb-1 flex items-center justify-center gap-1">
+                                                        Duplikat <Icon path={Icons.Layers} className="w-3 h-3"/>
                                                     </div>
-                                                    <div className="text-sm md:text-lg font-bold text-yellow-600">{duplicateData.length} Resi</div>
+                                                    <div className="text-2xl font-bold text-yellow-600">{duplicateData.length}</div>
+                                                    {duplicateData.length > 0 && <div className="absolute bottom-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>}
                                                 </div>
                                             </div>
 
-                                            <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                                            {/* LIST RESI */}
+                                            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar bg-slate-50/50 rounded-lg border border-slate-200 p-2">
                                                 <div className="space-y-2">
-                                                    {extractedData.map((item, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-100 shadow-sm rounded hover:border-orange-200 transition-all group">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-500 text-xs rounded-full font-mono">{idx + 1}</span>
-                                                                <div>
-                                                                    <div className="font-bold text-slate-800 font-mono text-lg tracking-wide">{item.resi}</div>
-                                                                    <div className="flex flex-col gap-0.5 text-xs text-slate-400">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`font-semibold ${item.type.includes('KiriminAja') ? 'text-purple-600' : item.type === 'POS Indonesia' ? 'text-orange-600' : item.type === 'Lion Parcel' ? 'text-red-600' : item.type === 'JNE' ? 'text-blue-800' : item.type === 'ID Express' ? 'text-red-500' : 'text-slate-600'}`}>{item.type}</span>
-                                                                            <span>• Hal: {item.page}</span>
+                                                    {extractedData.map((item, idx) => {
+                                                        // Styling khusus untuk GTL dan Ninja
+                                                        let cardStyle = "border-slate-200 hover:border-slate-300";
+                                                        let badgeStyle = "bg-slate-100 text-slate-600 border-slate-200";
+                                                        let iconColor = "text-slate-400";
+
+                                                        if (item.type === 'GTL') {
+                                                            cardStyle = "border-teal-200 bg-teal-50/30 hover:border-teal-300 hover:bg-teal-50/60";
+                                                            badgeStyle = "bg-teal-100 text-teal-700 border-teal-200 font-bold";
+                                                            iconColor = "text-teal-500";
+                                                        } else if (item.type === 'Ninja Van') {
+                                                            cardStyle = "border-red-200 bg-red-50/30 hover:border-red-300 hover:bg-red-50/60";
+                                                            badgeStyle = "bg-red-100 text-red-700 border-red-200 font-bold";
+                                                            iconColor = "text-red-500";
+                                                        }
+
+                                                        return (
+                                                            <div key={idx} className={`flex items-center justify-between p-3 bg-white border shadow-sm rounded-lg transition-all group ${cardStyle}`}>
+                                                                <div className="flex items-center gap-4">
+                                                                    <span className="w-8 h-8 flex items-center justify-center bg-white border border-slate-100 text-slate-400 text-xs rounded-full font-mono shadow-sm">{idx + 1}</span>
+                                                                    <div>
+                                                                        <div className="font-bold text-slate-800 font-mono text-lg tracking-wide flex items-center gap-2">
+                                                                            {item.resi}
+                                                                            {/* Icon kecil indikator */}
+                                                                            {(item.type === 'GTL' || item.type === 'Ninja Van') && (
+                                                                                <div className="w-2 h-2 rounded-full bg-current opacity-50"></div>
+                                                                            )}
                                                                         </div>
-                                                                        <div className="text-[10px] text-slate-300 truncate max-w-[200px]">File: {item.fileName}</div>
+                                                                        <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3 text-xs text-slate-400 mt-0.5">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <Icon path={Icons.FileText} className="w-3 h-3"/> 
+                                                                                <span className="truncate max-w-[150px]" title={item.fileName}>{item.fileName}</span>
+                                                                            </div>
+                                                                            <span className="hidden md:inline text-slate-300">•</span>
+                                                                            <span>Hal: {item.page}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
+                                                                <div className="flex flex-col items-end gap-2">
+                                                                    <span className={`text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-wider ${badgeStyle}`}>
+                                                                        {item.type}
+                                                                    </span>
+                                                                    <div className={`w-5 h-5 ${iconColor} opacity-0 group-hover:opacity-100 transition-opacity`}><Icon path={Icons.CheckCircle} className="w-full h-full" /></div>
+                                                                </div>
                                                             </div>
-                                                            <div className="w-5 h-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icon path={Icons.CheckCircle} className="w-full h-full" /></div>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-6 text-center text-xs text-slate-400"><p>Mendukung: J&T, SPX, Ninja (NJV), GTL, JNE (CM), LEX ID / Ninja (NLID, LXAD...), ID Express / KiriminAja (IDE...)</p><p>Mendukung Batch Upload: File akan diproses antrian satu per satu.</p><p>Sistem memproses PDF di browser Anda secara lokal (Client-side).</p></div>
+                        
+                        <div className="mt-8 text-center text-xs text-slate-400 space-y-1">
+                            <p>Support Khusus: <span className="text-teal-600 font-bold">GTL</span> (Format Angka), <span className="text-red-600 font-bold">Ninja Van</span> (Format NJV), J&T, SPX, JNE.</p>
+                            <p>Sistem memproses PDF secara lokal di browser (Aman & Cepat).</p>
+                        </div>
                         
                         {/* MODAL DUPLICATE */}
                         <Modal 
@@ -499,15 +528,15 @@
                                     <p className="text-center text-slate-400 py-4">Tidak ada resi ganda.</p>
                                 ) : (
                                     duplicateData.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-100 rounded">
+                                        <div key={idx} className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
                                             <div className="flex items-center gap-3">
-                                                <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-600 text-xs rounded-full font-mono">{idx + 1}</span>
+                                                <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-600 text-xs rounded-full font-mono font-bold">{idx + 1}</span>
                                                 <div>
                                                     <div className="font-bold text-slate-800 font-mono">{item.resi}</div>
                                                     <div className="text-xs text-slate-500">File: {item.fileName} • Hal: {item.page}</div>
                                                 </div>
                                             </div>
-                                            <span className="text-xs px-2 py-1 bg-white rounded border border-yellow-200 text-yellow-600">{item.type}</span>
+                                            <span className="text-[10px] px-2 py-1 bg-white rounded border border-yellow-200 text-yellow-600 font-bold uppercase">{item.type}</span>
                                         </div>
                                     ))
                                 )}
