@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urai Resi PDF - All Courier Support</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel untuk JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICONS ---
+        const Icon = ({ path, className, spin }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${className} ${spin ? 'animate-spin' : ''}`}>{path}</svg>
+        );
+
+        const Icons = {
+            Upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>,
+            FileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>,
+            CheckCircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
+            AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+            Copy: <><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></>,
+            Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+            Trash2: <><path d="M3 6h18M19 6v14c0 1.1-.9 2-2 2H7c-1.1 0-2-.9-2-2V6M8 6V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+            Loader2: <path d="M21 12a9 9 0 1 1-6.219-8.56"/>,
+            Search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+            Package: <><path d="m16.5 9.4-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
+            X: <path d="M18 6 6 18M6 6l12 12"/>,
+            Layers: <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
+            Info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>
+        };
+
+        // --- MODAL COMPONENT ---
+        const Modal = ({ isOpen, onClose, title, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors">
+                                <div className="w-6 h-6"><Icon path={Icons.X} className="w-full h-full" /></div>
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
+                            {children}
+                        </div>
+                        <div className="p-4 border-t bg-slate-50 text-right rounded-b-lg">
+                            <button onClick={onClose} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded font-medium transition-colors">Tutup</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP COMPONENT ---
+        function App() {
+            const [pdfFiles, setPdfFiles] = useState([]); 
+            const [isProcessing, setIsProcessing] = useState(false);
+            
+            const [extractedData, setExtractedData] = useState([]); // Data Unik (Clean)
+            const [duplicateData, setDuplicateData] = useState([]); // Data Duplikat
+            
+            const [logs, setLogs] = useState([]);
+            const [errorMsg, setErrorMsg] = useState('');
+            
+            // State untuk statistik
+            const [stats, setStats] = useState({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+            
+            // State Modal
+            const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+
+            const handleFileChange = (event) => {
+                const files = Array.from(event.target.files);
+                const validFiles = files.filter(file => file.type === 'application/pdf');
+                if (validFiles.length > 0) {
+                    setPdfFiles(prev => [...prev, ...validFiles]);
+                    setExtractedData([]); setDuplicateData([]); setLogs([]); setErrorMsg('');
+                    setStats({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+                } else {
+                    setErrorMsg('Mohon upload file format PDF.');
+                }
+            };
+
+            const removeFile = (index) => setPdfFiles(prev => prev.filter((_, i) => i !== index));
+            const clearAllFiles = () => { 
+                setPdfFiles([]); setExtractedData([]); setDuplicateData([]); setLogs([]); 
+                setStats({ totalPages: 0, processedPages: 0, emptyPages: 0 });
+            };
+
+            const cleanResiString = (resi, provider) => {
+                if (!resi) return null;
+                let clean = resi.replace(/\s+/g, '').trim().toUpperCase();
+
+                // 1. KHUSUS LION PARCEL
+                if (provider === 'Lion Parcel' || clean.startsWith('C1')) {
+                    const lionMatch = clean.match(/^C1[A-Z0-9]{6}/);
+                    if (lionMatch) return lionMatch[0];
+                    if (clean.startsWith('C1') && clean.length >= 8) return clean.substring(0, 8);
+                }
+
+                // 2. Cek Duplikat (Mirroring)
+                if (clean.length >= 10 && clean.length % 2 === 0) {
+                    const mid = clean.length / 2;
+                    if (clean.slice(0, mid) === clean.slice(mid)) {
+                        clean = clean.slice(0, mid);
+                    }
+                }
+
+                // 3. J&T
+                if (provider === 'J&T Express' || /^(JO|JX|JP|EZ|JS|JT)/.test(clean)) {
+                    const match = clean.match(/^(JO|JX|JP|EZ|JS|JT)[0-9]{10,12}/);
+                    if (match) clean = match[0];
+                }
+
+                // 4. ID Express
+                if (provider === 'ID Express' || clean.startsWith('IDE')) {
+                    const match = clean.match(/^(IDE|IDS)[0-9]{10,15}/);
+                    if (match) clean = match[0];
+                }
+
+                // 5. Validasi Panjang
+                if (clean.length < 6 || clean.length > 30) return null;
+
+                return clean;
+            };
+
+            const extractResi = async () => {
+                if (pdfFiles.length === 0) return;
+                setIsProcessing(true);
+                setLogs(['Memulai proses scan batch PDF...']);
+                setExtractedData([]);
+                setDuplicateData([]);
+                
+                // Penampung Sementara
+                let tempUniqueResis = [];
+                let tempDuplicateResis = [];
+                let globalSeenResis = new Set(); // Untuk tracking global
+
+                let totalPageCount = 0;
+                let pagesWithResiCount = 0;
+
+                try {
+                    for (let fIndex = 0; fIndex < pdfFiles.length; fIndex++) {
+                        const file = pdfFiles[fIndex];
+                        setLogs(prev => [...prev, `\n📂 Memproses file (${fIndex + 1}/${pdfFiles.length}): ${file.name}`]);
+
+                        try {
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                            const totalPages = pdf.numPages;
+                            totalPageCount += totalPages;
+
+                            for (let i = 1; i <= totalPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const textContent = await page.getTextContent();
+                                const pageText = textContent.items.map(item => item.str).join(' ');
+                                
+                                if (pageText.trim().length < 10) continue;
+
+                                let pageResisRaw = []; // Resi mentah per halaman (sebelum cek global)
+                                const isKiriminAja = /kiriminaja/i.test(pageText);
+
+                                if (isKiriminAja) {
+                                    let subCourier = 'KiriminAja'; 
+                                    if (/POS\s*IND|POS\s*INDONESIA/i.test(pageText)) subCourier = 'POS Indonesia';
+                                    else if (/LION\s*PARCEL/i.test(pageText)) subCourier = 'Lion Parcel';
+                                    else if (/\bJNE\b/i.test(pageText)) subCourier = 'JNE';
+                                    else if (/\bNINJA\b/i.test(pageText)) subCourier = 'Ninja Van';
+                                    else if (/J&T/i.test(pageText)) subCourier = 'J&T Express';
+                                    else if (/ID\s*EXPRESS/i.test(pageText)) subCourier = 'ID Express';
+                                    else if (/SICEPAT/i.test(pageText)) subCourier = 'SiCepat';
+                                    else if (/SAP/i.test(pageText)) subCourier = 'SAP Express';
+                                    else if (/ANTERAJA/i.test(pageText)) subCourier = 'Anteraja';
+
+                                    const awbMatch = pageText.match(/AWB\s*[:.-]?\s*([A-Z0-9-]+(?:\s+[A-Z0-9-]+)*)/i);
+                                    if (awbMatch && awbMatch[1]) {
+                                        let rawString = awbMatch[1];
+                                        const cutOffRegex = /(OID|No\.|Trx|Tgl|Pengirim|Penerima|COD|Rp|Total|Qty)/i;
+                                        const cutIndex = rawString.search(cutOffRegex);
+                                        if (cutIndex !== -1) rawString = rawString.substring(0, cutIndex);
+
+                                        let finalResi = cleanResiString(rawString, subCourier);
+                                        if (finalResi) pageResisRaw.push({ resi: finalResi, type: subCourier, fileName: file.name, page: i });
+                                    }
+                                    
+                                    const ninjaKAMatch = pageText.match(/\b(KRMJAOID)\s*[-]?\s*([0-9]+)\b/i);
+                                    if (ninjaKAMatch) {
+                                         const fullResi = `${ninjaKAMatch[1]}-${ninjaKAMatch[2]}`;
+                                         // Cek lokal page agar tidak double dari AWB match
+                                         if (!pageResisRaw.some(r => r.resi === fullResi)) {
+                                            pageResisRaw.push({ resi: fullResi, type: 'Ninja Van', fileName: file.name, page: i });
+                                         }
+                                    }
+                                }
+
+                                const standardPatterns = [
+                                    { regex: /\b(JX|JP|JO|EZ|JS|JT)[0-9]{10,15}\b/gi, type: 'J&T Express' },
+                                    { regex: /\bSPXID[A-Z0-9]{10,20}\b/gi, type: 'SPX Express' },
+                                    { regex: /\b(NJV|KRMJAOID)[A-Z0-9-]{10,25}\b/gi, type: 'Ninja Van' },
+                                    { regex: /\bGTL[A-Z0-9]{10,20}\b/gi, type: 'GTL' },
+                                    { regex: /\b(CM|KAJ)[0-9]{10,20}\b/gi, type: 'JNE' },
+                                    { regex: /\b(IDE|IDS)[0-9]{10,20}\b/gi, type: 'ID Express' },
+                                    { regex: /\bOID[0-9]{10,20}\b/gi, type: 'POS Indonesia' },
+                                    { regex: /\bC1[A-Z0-9]{6,10}\b/gi, type: 'Lion Parcel' } 
+                                ];
+
+                                standardPatterns.forEach(({ regex, type }) => {
+                                    const matches = pageText.match(regex);
+                                    if (matches) {
+                                        matches.forEach(resi => {
+                                            const finalResi = cleanResiString(resi, type);
+                                            if (finalResi) {
+                                                // Cek lokal page
+                                                const exists = pageResisRaw.find(r => r.resi === finalResi);
+                                                if (!exists) {
+                                                    let finalType = type;
+                                                    if (isKiriminAja) {
+                                                        if (type === 'Lion Parcel') finalType = 'Lion Parcel'; 
+                                                        else if (/POS\s*IND/i.test(pageText)) finalType = 'POS Indonesia';
+                                                        else if (/LION/i.test(pageText)) finalType = 'Lion Parcel';
+                                                        else if (/JNE/i.test(pageText)) finalType = 'JNE';
+                                                    }
+                                                    pageResisRaw.push({ resi: finalResi, type: finalType, fileName: file.name, page: i });
+                                                }
+                                            }
+                                        });
+                                    }
+                                });
+
+                                // LAZADA
+                                if (!isKiriminAja) {
+                                    const lazadaPattern = /\b(NLID|LXAD|LXRP)[A-Z0-9-]{9,25}\b/gi;
+                                    const matches = pageText.match(lazadaPattern);
+                                    if (matches) {
+                                        matches.forEach(resi => {
+                                            const finalResi = cleanResiString(resi, 'LEX ID');
+                                            if (finalResi) {
+                                                let type = 'LEX ID';
+                                                const headerMatch = pageText.match(/Diserahkan\s*ke[\s\S]{0,50}?(NINJA|LEX)/i);
+                                                if (headerMatch) {
+                                                    if (headerMatch[1].toUpperCase().includes('NINJA')) type = 'Ninja Van';
+                                                } else {
+                                                    if (/NINJA/i.test(pageText) && !/\bLEX\b/i.test(pageText)) type = 'Ninja Van';
+                                                }
+                                                if (!pageResisRaw.find(r => r.resi === finalResi)) {
+                                                    pageResisRaw.push({ resi: finalResi, type: type, fileName: file.name, page: i });
+                                                }
+                                            }
+                                        });
+                                    }
+                                }
+
+                                // --- PEMROSESAN AKHIR HALAMAN ---
+                                if (pageResisRaw.length > 0) {
+                                    pagesWithResiCount++;
+                                    
+                                    // Filter Duplikat dalam 1 halaman (Ambil yang terpanjang/terbaik jika konflik)
+                                    // Kita gunakan Map untuk deduplikasi lokal
+                                    let pageUnique = new Map();
+                                    pageResisRaw.forEach(item => {
+                                        if (!pageUnique.has(item.resi)) {
+                                            pageUnique.set(item.resi, item);
+                                        }
+                                    });
+                                    
+                                    // Sekarang Cek ke Global
+                                    let foundCount = 0;
+                                    pageUnique.forEach((item) => {
+                                        if (globalSeenResis.has(item.resi)) {
+                                            // INI DUPLIKAT GLOBAL
+                                            tempDuplicateResis.push(item);
+                                        } else {
+                                            // INI UNIK
+                                            globalSeenResis.add(item.resi);
+                                            tempUniqueResis.push(item);
+                                            foundCount++;
+                                        }
+                                    });
+
+                                    if (foundCount > 0) {
+                                        setLogs(prev => [...prev, `   ✓ Hal ${i}: Ditemukan ${foundCount} resi baru.`]);
+                                    } else {
+                                        setLogs(prev => [...prev, `   ⚠ Hal ${i}: Resi sudah ada sebelumnya (Double).`]);
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            setLogs(prev => [...prev, `   ❌ Gagal membaca file: ${file.name}`]);
+                        }
+                    }
+
+                    setExtractedData(tempUniqueResis);
+                    setDuplicateData(tempDuplicateResis);
+                    
+                    setStats({
+                        totalPages: totalPageCount,
+                        processedPages: pagesWithResiCount,
+                        emptyPages: totalPageCount - pagesWithResiCount
+                    });
+
+                    setLogs(prev => [...prev, `\n✅ Selesai! Total ${tempUniqueResis.length} unik, ${tempDuplicateResis.length} double.`]);
+
+                } catch (error) {
+                    setErrorMsg("Terjadi kesalahan fatal saat memproses antrian PDF.");
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            const copyToClipboard = () => {
+                const text = extractedData.map(item => item.resi).join('\n');
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Semua nomor resi berhasil disalin!');
+                } catch (err) {
+                    alert('Gagal menyalin otomatis. Silakan salin manual.');
+                }
+                document.body.removeChild(textarea);
+            };
+
+            const downloadCSV = () => {
+                const headers = "No;Nomor Resi;Nama File;Halaman;Ekspedisi\n";
+                const rows = extractedData.map((item, index) => {
+                    return `${index + 1};${item.resi};"${item.fileName}";${item.page};${item.type}`;
+                }).join('\n');
+                const csvContent = "data:text/csv;charset=utf-8,%EF%BB%BF" + encodeURIComponent(headers + rows);
+                const link = document.createElement("a");
+                link.setAttribute("href", csvContent);
+                link.setAttribute("download", "hasil_urai_resi_batch.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="mb-8 text-center">
+                            <h1 className="text-3xl font-bold text-orange-600 mb-2 flex items-center justify-center gap-2">
+                                <Icon path={Icons.Package} className="w-8 h-8" />
+                                Urai Resi PDF
+                            </h1>
+                            <p className="text-slate-600">Upload <strong>banyak PDF</strong> sekaligus (J&T, SPX, Ninja, JNE, POS, ID Express, KiriminAja, Lion), alat ini akan menggabungkan semua resi.</p>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
+                            <div className="p-8 bg-slate-50 border-b border-slate-200">
+                                <div className="flex flex-col items-center gap-4">
+                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50 hover:bg-orange-100 transition-colors">
+                                        <div className="w-10 h-10 text-orange-500 mb-2"><Icon path={Icons.Upload} className="w-full h-full" /></div>
+                                        <span className="text-sm text-slate-600 font-medium">Klik untuk tambah file PDF</span>
+                                        <span className="text-xs text-slate-400 mt-1">(Bisa pilih banyak file sekaligus)</span>
+                                        <input type="file" accept="application/pdf" multiple className="hidden" onChange={handleFileChange} />
+                                    </label>
+                                    
+                                    {pdfFiles.length > 0 && (
+                                        <div className="w-full space-y-2 max-h-40 overflow-y-auto custom-scrollbar bg-white p-2 rounded border border-slate-200">
+                                            <div className="flex justify-between items-center px-2 pb-2 border-b border-slate-100">
+                                                <span className="text-xs font-bold text-slate-500">{pdfFiles.length} File Dipilih</span>
+                                                <button onClick={clearAllFiles} className="text-xs text-red-500 hover:underline">Hapus Semua</button>
+                                            </div>
+                                            {pdfFiles.map((file, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded text-sm">
+                                                    <div className="flex items-center gap-2 truncate">
+                                                        <div className="w-4 h-4 text-slate-400"><Icon path={Icons.FileText} className="w-full h-full" /></div>
+                                                        <span className="truncate max-w-[200px]">{file.name}</span>
+                                                    </div>
+                                                    <button onClick={() => removeFile(idx)} className="text-slate-400 hover:text-red-500 transition-colors"><div className="w-4 h-4"><Icon path={Icons.X} className="w-full h-full" /></div></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <button onClick={extractResi} disabled={pdfFiles.length === 0 || isProcessing} className={`w-full py-3 rounded-lg font-bold text-white transition-all flex items-center justify-center gap-2 ${pdfFiles.length === 0 || isProcessing ? 'bg-slate-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700 shadow-md hover:shadow-lg'}`}>
+                                        <div className="w-5 h-5"><Icon path={isProcessing ? Icons.Loader2 : Icons.Search} className="w-full h-full" spin={isProcessing} /></div>
+                                        {isProcessing ? `Sedang Mengurai ${pdfFiles.length} File...` : 'Mulai Urai Semua File'}
+                                    </button>
+                                </div>
+                                {errorMsg && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center gap-2 text-sm"><div className="w-4 h-4"><Icon path={Icons.AlertCircle} className="w-full h-full" /></div> {errorMsg}</div>}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+                                <div className="p-4 bg-slate-50 md:col-span-1 h-80 overflow-y-auto text-xs font-mono border-b md:border-b-0">
+                                    <h3 className="font-bold text-slate-700 mb-2 sticky top-0 bg-slate-50 pb-1 border-b border-slate-200">Log Proses</h3>
+                                    <ul className="space-y-1">{logs.map((log, idx) => <li key={idx} className={`whitespace-pre-wrap ${log.includes('❌') ? 'text-red-600' : 'text-slate-600'}`}>{log}</li>)}</ul>
+                                </div>
+
+                                <div className="p-6 md:col-span-2 bg-white min-h-[20rem]">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div><h2 className="text-lg font-bold text-slate-800">Hasil Urai</h2><p className="text-sm text-slate-500">Ditemukan: <span className="font-bold text-orange-600">{extractedData.length}</span> Resi Unik</p></div>
+                                        {extractedData.length > 0 && (
+                                            <div className="flex gap-2">
+                                                <button onClick={copyToClipboard} className="p-2 text-slate-600 hover:bg-slate-100 rounded border border-slate-300 transition-colors" title="Copy All"><div className="w-4 h-4"><Icon path={Icons.Copy} className="w-full h-full" /></div></button>
+                                                <button onClick={downloadCSV} className="p-2 text-green-600 hover:bg-green-50 rounded border border-green-200 transition-colors" title="Download CSV"><div className="w-4 h-4"><Icon path={Icons.Download} className="w-full h-full" /></div></button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {extractedData.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50 pb-10"><div className="w-16 h-16 mb-2"><Icon path={Icons.Package} className="w-full h-full" /></div><p>Belum ada data resi</p></div>
+                                    ) : (
+                                        <>
+                                            {/* STATISTIK CARD DENGAN KLIK MODAL DOUBLE */}
+                                            <div className="grid grid-cols-4 gap-2 md:gap-4 mb-4">
+                                                <div className="bg-blue-50 p-2 md:p-3 rounded border border-blue-100 text-center">
+                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Upload</div>
+                                                    <div className="text-sm md:text-lg font-bold text-blue-600">{stats.totalPages} Hal</div>
+                                                </div>
+                                                <div className="bg-green-50 p-2 md:p-3 rounded border border-green-100 text-center">
+                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Berhasil</div>
+                                                    <div className="text-sm md:text-lg font-bold text-green-600">{stats.processedPages} Hal</div>
+                                                </div>
+                                                <div className="bg-red-50 p-2 md:p-3 rounded border border-red-100 text-center">
+                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1">Kosong</div>
+                                                    <div className="text-sm md:text-lg font-bold text-red-500">{stats.emptyPages} Hal</div>
+                                                </div>
+                                                {/* KOTAK DOUBLE RESI */}
+                                                <div 
+                                                    onClick={() => duplicateData.length > 0 && setIsDuplicateModalOpen(true)}
+                                                    className={`p-2 md:p-3 rounded border text-center transition-all ${duplicateData.length > 0 ? 'bg-yellow-50 border-yellow-200 cursor-pointer hover:bg-yellow-100 hover:shadow-sm' : 'bg-slate-50 border-slate-100 opacity-50'}`}
+                                                >
+                                                    <div className="text-[10px] md:text-xs text-slate-500 mb-1 flex items-center justify-center gap-1">
+                                                        Double <div className="w-3 h-3"><Icon path={Icons.Layers} className="w-full h-full" /></div>
+                                                    </div>
+                                                    <div className="text-sm md:text-lg font-bold text-yellow-600">{duplicateData.length} Resi</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                                                <div className="space-y-2">
+                                                    {extractedData.map((item, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-100 shadow-sm rounded hover:border-orange-200 transition-all group">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="w-6 h-6 flex items-center justify-center bg-slate-100 text-slate-500 text-xs rounded-full font-mono">{idx + 1}</span>
+                                                                <div>
+                                                                    <div className="font-bold text-slate-800 font-mono text-lg tracking-wide">{item.resi}</div>
+                                                                    <div className="flex flex-col gap-0.5 text-xs text-slate-400">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className={`font-semibold ${item.type.includes('KiriminAja') ? 'text-purple-600' : item.type === 'POS Indonesia' ? 'text-orange-600' : item.type === 'Lion Parcel' ? 'text-red-600' : item.type === 'JNE' ? 'text-blue-800' : item.type === 'ID Express' ? 'text-red-500' : 'text-slate-600'}`}>{item.type}</span>
+                                                                            <span>• Hal: {item.page}</span>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-slate-300 truncate max-w-[200px]">File: {item.fileName}</div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-5 h-5 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icon path={Icons.CheckCircle} className="w-full h-full" /></div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mt-6 text-center text-xs text-slate-400"><p>Mendukung: J&T, SPX, Ninja (NJV), GTL, JNE (CM), LEX ID / Ninja (NLID, LXAD...), ID Express / KiriminAja (IDE...)</p><p>Mendukung Batch Upload: File akan diproses antrian satu per satu.</p><p>Sistem memproses PDF di browser Anda secara lokal (Client-side).</p></div>
+                        
+                        {/* MODAL DUPLICATE */}
+                        <Modal 
+                            isOpen={isDuplicateModalOpen} 
+                            onClose={() => setIsDuplicateModalOpen(false)} 
+                            title={`Daftar Resi Ganda (${duplicateData.length})`}
+                        >
+                            <div className="space-y-2">
+                                {duplicateData.length === 0 ? (
+                                    <p className="text-center text-slate-400 py-4">Tidak ada resi ganda.</p>
+                                ) : (
+                                    duplicateData.map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-100 rounded">
+                                            <div className="flex items-center gap-3">
+                                                <span className="w-6 h-6 flex items-center justify-center bg-yellow-100 text-yellow-600 text-xs rounded-full font-mono">{idx + 1}</span>
+                                                <div>
+                                                    <div className="font-bold text-slate-800 font-mono">{item.resi}</div>
+                                                    <div className="text-xs text-slate-500">File: {item.fileName} • Hal: {item.page}</div>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs px-2 py-1 bg-white rounded border border-yellow-200 text-yellow-600">{item.type}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </Modal>
+
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
