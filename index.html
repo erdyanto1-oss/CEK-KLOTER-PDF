@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - V28 (Fix Lazada & Ninja Length)</title>
+    <title>Urai Resi PDF - V29 (Fix NLID & LXAD Length)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -175,7 +175,7 @@
                 setProgress(0);
             };
 
-            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V28) ---
+            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V29) ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
                 
@@ -188,13 +188,11 @@
                 });
 
                 if (provider === 'Lazada Express') {
-                    // Pastikan format LXAD-
                     if (clean.startsWith('LXAD') && !clean.includes('-')) {
                         clean = clean.replace('LXAD', 'LXAD-');
                     }
                     
-                    // FIX V28: Lazada LXAD biasanya 10 digit (total 15 char dengan 'LXAD-')
-                    // Mencegah masuknya angka sort code (misal 3A...) yang menempel
+                    // FIX V28: Lazada LXAD limit
                     if (clean.startsWith('LXAD')) {
                          if (clean.length > 15) clean = clean.substring(0, 15);
                     } else {
@@ -202,11 +200,13 @@
                     }
                 }
 
-                // FIX V27 logic preserved
+                // FIX V29: Tambahan Logic untuk NLID (Ninja Van via Lazada)
                 if (provider === 'Ninja Van') {
-                    if (clean.startsWith('NJV')) {
+                    // Jika diawali NJV atau NLID, potong paksa ke 16 karakter
+                    if (clean.startsWith('NJV') || clean.startsWith('NLID')) {
                         if (clean.length > 16) clean = clean.substring(0, 16);
                     } else {
+                        // Default Ninja lainnya
                         if (clean.length > 18) clean = clean.substring(0, 18);
                     }
                 }
@@ -506,7 +506,7 @@
                             </div>
                         </h1>
                         <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                            V28 (Fix Lazada & Ninja Length)
+                            V29 (Fix NLID Length)
                         </div>
                     </nav>
 
