@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - V27 (Fix Ninja Van & Lazada)</title>
+    <title>Urai Resi PDF - V28 (Fix Lazada & Ninja Length)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -175,11 +175,10 @@
                 setProgress(0);
             };
 
-            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V27) ---
+            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V28) ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
                 
-                // FIX V26: Mengizinkan dash (-) agar resi Lazada tetap akurat (LXAD-...)
                 let clean = resi.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
                 
                 const garbageWords = ["PENERIMA", "PENGIRIM", "HOME", "COD", "KOTA", "KAB", "JALAN", "NASHIR", "OFFICIAL", "AWB"];
@@ -188,21 +187,26 @@
                     if (idx > 5) clean = clean.substring(0, idx);
                 });
 
-                // FIX V26: Memastikan format Lazada selalu LXAD-XXXXX
                 if (provider === 'Lazada Express') {
+                    // Pastikan format LXAD-
                     if (clean.startsWith('LXAD') && !clean.includes('-')) {
                         clean = clean.replace('LXAD', 'LXAD-');
                     }
-                    if (clean.length > 20) clean = clean.substring(0, 20);
+                    
+                    // FIX V28: Lazada LXAD biasanya 10 digit (total 15 char dengan 'LXAD-')
+                    // Mencegah masuknya angka sort code (misal 3A...) yang menempel
+                    if (clean.startsWith('LXAD')) {
+                         if (clean.length > 15) clean = clean.substring(0, 15);
+                    } else {
+                         if (clean.length > 20) clean = clean.substring(0, 20);
+                    }
                 }
 
-                // FIX V27: Logic Khusus Ninja Van (NJV)
-                // Memotong paksa jika lebih dari 16 karakter untuk membuang angka COD/noise
+                // FIX V27 logic preserved
                 if (provider === 'Ninja Van') {
                     if (clean.startsWith('NJV')) {
                         if (clean.length > 16) clean = clean.substring(0, 16);
                     } else {
-                        // Untuk NLID dll, biarkan max 18
                         if (clean.length > 18) clean = clean.substring(0, 18);
                     }
                 }
@@ -321,9 +325,7 @@
                                     { regex: /SPXID[A-Z0-9]{10,30}/gi, type: 'SPX Express' },
                                     
                                     // FIX V27: Memisahkan Regex Ninja Van
-                                    // NJV Prefix: Strict 13 chars (Total 16) agar tidak kena angka tetangga
                                     { regex: /NJV[A-Z0-9]{13}/gi, type: 'Ninja Van' },
-                                    // Ninja Van Generic/Others
                                     { regex: /(KRMJAOID|NLID)[A-Z0-9]{10,30}/gi, type: 'Ninja Van' },
                                     
                                     { regex: /(CM|KAJ|TJP)[0-9]{10,20}/gi, type: 'JNE' },
@@ -504,7 +506,7 @@
                             </div>
                         </h1>
                         <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                            V27 (Fix Ninja Noise)
+                            V28 (Fix Lazada & Ninja Length)
                         </div>
                     </nav>
 
