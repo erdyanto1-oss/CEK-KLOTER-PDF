@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - V22 (Expedition Stats Breakdown)</title>
+    <title>Urai Resi PDF - V25 (Fix Case Sensitive & Ninja-Lazada)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,7 +87,7 @@
         const ExpeditionCard = ({ name, count }) => (
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2 shadow-sm min-w-[140px] flex-1">
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                    <div className={`w-2 h-2 rounded-full ${name.includes('Lazada') ? 'bg-pink-500' : 'bg-indigo-500'}`}></div>
                     <span className="text-xs font-semibold text-slate-600 truncate max-w-[100px]" title={name}>{name}</span>
                 </div>
                 <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{count}</span>
@@ -175,10 +175,12 @@
                 setProgress(0);
             };
 
-            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (Sama dengan sebelumnya) ---
+            // --- LOGIKA PEMBERSIHAN & EXTRAKSI ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
+                // Simpan dash (-) sementara jika dibutuhkan, tapi biasanya kita remove
                 let clean = resi.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                
                 const garbageWords = ["PENERIMA", "PENGIRIM", "HOME", "COD", "KOTA", "KAB", "JALAN", "NASHIR", "OFFICIAL", "AWB"];
                 garbageWords.forEach(word => {
                     const idx = clean.indexOf(word);
@@ -188,6 +190,12 @@
                 if (provider === 'Lion Parcel' || clean.startsWith('C1')) {
                     if (clean.length >= 8) return clean.substring(0, 8);
                 }
+                
+                // Logic length untuk provider lain
+                if (provider === 'Lazada Express') {
+                    if (clean.length > 20) clean = clean.substring(0, 20);
+                }
+
                 if (provider === 'SPX Express' && clean.length > 17) clean = clean.substring(0, 17); 
                 if (provider === 'J&T Express' && clean.length > 12) clean = clean.substring(0, 12);
                 if (provider === 'Ninja Van' && clean.length > 18) clean = clean.substring(0, 18);
@@ -208,6 +216,7 @@
             };
 
             const detectTypeFromResi = (cleanResi) => {
+                if (cleanResi.startsWith("LXAD")) return "Lazada Express"; 
                 if (cleanResi.startsWith("GTL")) return "GTL";
                 if (cleanResi.startsWith("SPX")) return "SPX Express";
                 if (cleanResi.startsWith("C1")) return "Lion Parcel";
@@ -288,8 +297,9 @@
 
                                 let foundResi = null;
 
-                                // Text Mining
+                                // --- PATTERNS ---
                                 const standardPatterns = [
+                                    { regex: /LXAD-?[0-9]{10,20}/gi, type: 'Lazada Express' },
                                     { regex: /(JX|JP|JO|EZ|JS|JT)[0-9]{10,20}/gi, type: 'J&T Express' },
                                     { regex: /C1[A-Z0-9]{6,15}/gi, type: 'Lion Parcel' },
                                     { regex: /GTL[0-9]{10,20}/gi, type: 'GTL' },
@@ -372,6 +382,21 @@
 
                                 // Finalisasi Per Halaman
                                 if (foundResi) {
+                                    // FIX V25: Case Insensitive & Lebih Agresif
+                                    // Mengubah NLID (Ninja) menjadi Lazada Express jika ditemukan marker Lazada/LEX/LXAD pada halaman
+                                    const pageTextUpper = rawTextStr.toUpperCase();
+                                    
+                                    if (foundResi.type === 'Ninja Van') {
+                                        if (
+                                            pageTextUpper.includes('LAZADA') || 
+                                            pageTextUpper.includes('LEX') || 
+                                            pageTextUpper.includes('LXAD') ||
+                                            pageTextUpper.includes('LOGISTIK')
+                                        ) {
+                                            foundResi.type = 'Lazada Express';
+                                        }
+                                    }
+
                                     pagesWithResiCount++;
                                     if (globalSeenResis.has(foundResi.resi)) {
                                         tempDuplicateResis.push(foundResi);
@@ -456,7 +481,7 @@
                             </div>
                         </h1>
                         <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                            V22 + Stats
+                            V25 (Fix Case Sensitive)
                         </div>
                     </nav>
 
