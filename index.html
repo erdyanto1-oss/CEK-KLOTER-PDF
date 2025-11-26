@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - V25 (Fix Case Sensitive & Ninja-Lazada)</title>
+    <title>Urai Resi PDF - V27 (Fix Ninja Van & Lazada)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,7 +87,7 @@
         const ExpeditionCard = ({ name, count }) => (
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2 shadow-sm min-w-[140px] flex-1">
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${name.includes('Lazada') ? 'bg-pink-500' : 'bg-indigo-500'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${name.includes('Lazada') ? 'bg-pink-500' : name.includes('Ninja') ? 'bg-red-500' : 'bg-indigo-500'}`}></div>
                     <span className="text-xs font-semibold text-slate-600 truncate max-w-[100px]" title={name}>{name}</span>
                 </div>
                 <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{count}</span>
@@ -175,11 +175,12 @@
                 setProgress(0);
             };
 
-            // --- LOGIKA PEMBERSIHAN & EXTRAKSI ---
+            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V27) ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
-                // Simpan dash (-) sementara jika dibutuhkan, tapi biasanya kita remove
-                let clean = resi.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+                
+                // FIX V26: Mengizinkan dash (-) agar resi Lazada tetap akurat (LXAD-...)
+                let clean = resi.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
                 
                 const garbageWords = ["PENERIMA", "PENGIRIM", "HOME", "COD", "KOTA", "KAB", "JALAN", "NASHIR", "OFFICIAL", "AWB"];
                 garbageWords.forEach(word => {
@@ -187,20 +188,34 @@
                     if (idx > 5) clean = clean.substring(0, idx);
                 });
 
+                // FIX V26: Memastikan format Lazada selalu LXAD-XXXXX
+                if (provider === 'Lazada Express') {
+                    if (clean.startsWith('LXAD') && !clean.includes('-')) {
+                        clean = clean.replace('LXAD', 'LXAD-');
+                    }
+                    if (clean.length > 20) clean = clean.substring(0, 20);
+                }
+
+                // FIX V27: Logic Khusus Ninja Van (NJV)
+                // Memotong paksa jika lebih dari 16 karakter untuk membuang angka COD/noise
+                if (provider === 'Ninja Van') {
+                    if (clean.startsWith('NJV')) {
+                        if (clean.length > 16) clean = clean.substring(0, 16);
+                    } else {
+                        // Untuk NLID dll, biarkan max 18
+                        if (clean.length > 18) clean = clean.substring(0, 18);
+                    }
+                }
+
                 if (provider === 'Lion Parcel' || clean.startsWith('C1')) {
                     if (clean.length >= 8) return clean.substring(0, 8);
                 }
                 
-                // Logic length untuk provider lain
-                if (provider === 'Lazada Express') {
-                    if (clean.length > 20) clean = clean.substring(0, 20);
-                }
-
                 if (provider === 'SPX Express' && clean.length > 17) clean = clean.substring(0, 17); 
                 if (provider === 'J&T Express' && clean.length > 12) clean = clean.substring(0, 12);
-                if (provider === 'Ninja Van' && clean.length > 18) clean = clean.substring(0, 18);
                 if (provider === 'ID Express' && clean.length > 16) clean = clean.substring(0, 16);
                 if (provider === 'JNE' && clean.length > 18) clean = clean.substring(0, 18);
+                
                 if (clean.length < 8) return null;
                 return clean;
             };
@@ -304,7 +319,13 @@
                                     { regex: /C1[A-Z0-9]{6,15}/gi, type: 'Lion Parcel' },
                                     { regex: /GTL[0-9]{10,20}/gi, type: 'GTL' },
                                     { regex: /SPXID[A-Z0-9]{10,30}/gi, type: 'SPX Express' },
-                                    { regex: /(NJV|KRMJAOID|NLID)[A-Z0-9]{10,30}/gi, type: 'Ninja Van' },
+                                    
+                                    // FIX V27: Memisahkan Regex Ninja Van
+                                    // NJV Prefix: Strict 13 chars (Total 16) agar tidak kena angka tetangga
+                                    { regex: /NJV[A-Z0-9]{13}/gi, type: 'Ninja Van' },
+                                    // Ninja Van Generic/Others
+                                    { regex: /(KRMJAOID|NLID)[A-Z0-9]{10,30}/gi, type: 'Ninja Van' },
+                                    
                                     { regex: /(CM|KAJ|TJP)[0-9]{10,20}/gi, type: 'JNE' },
                                     { regex: /(IDE|IDS)[0-9]{10,20}/gi, type: 'ID Express' }, 
                                     { regex: /1000[0-9]{9,15}/gi, type: 'Anteraja' },
@@ -357,6 +378,7 @@
                                         }
 
                                         if (rawCode) {
+                                            // Pre-clean untuk deteksi tipe
                                             let cleanCode = rawCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
                                             const tokpedMatch = cleanCode.match(/58[0-9]{16,}/);
                                             if (tokpedMatch) cleanCode = tokpedMatch[0];
@@ -383,7 +405,6 @@
                                 // Finalisasi Per Halaman
                                 if (foundResi) {
                                     // FIX V25: Case Insensitive & Lebih Agresif
-                                    // Mengubah NLID (Ninja) menjadi Lazada Express jika ditemukan marker Lazada/LEX/LXAD pada halaman
                                     const pageTextUpper = rawTextStr.toUpperCase();
                                     
                                     if (foundResi.type === 'Ninja Van') {
@@ -394,6 +415,8 @@
                                             pageTextUpper.includes('LOGISTIK')
                                         ) {
                                             foundResi.type = 'Lazada Express';
+                                            // Re-clean sebagai Lazada untuk memastikan format LXAD-
+                                            foundResi.resi = cleanResiString(foundResi.resi, 'Lazada Express');
                                         }
                                     }
 
@@ -481,7 +504,7 @@
                             </div>
                         </h1>
                         <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                            V25 (Fix Case Sensitive)
+                            V27 (Fix Ninja Noise)
                         </div>
                     </nav>
 
@@ -675,7 +698,7 @@
                         </div>
                     </div>
 
-                    {/* MODAL DUPLICATE - SEKARANG BERFUNGSI */}
+                    {/* MODAL DUPLICATE */}
                     <ResultModal 
                         isOpen={isDuplicateModalOpen} 
                         onClose={() => setIsDuplicateModalOpen(false)} 
