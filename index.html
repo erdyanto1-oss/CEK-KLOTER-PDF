@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Urai Resi PDF - V29 (Fix NLID & LXAD Length)</title>
+    <title>Urai Resi PDF - V32 (Fix Akurasi Pos Indonesia)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,7 +87,7 @@
         const ExpeditionCard = ({ name, count }) => (
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2 shadow-sm min-w-[140px] flex-1">
                 <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${name.includes('Lazada') ? 'bg-pink-500' : name.includes('Ninja') ? 'bg-red-500' : 'bg-indigo-500'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${name.includes('Lazada') ? 'bg-pink-500' : name.includes('Pos') ? 'bg-orange-500' : name.includes('Ninja') ? 'bg-red-500' : 'bg-indigo-500'}`}></div>
                     <span className="text-xs font-semibold text-slate-600 truncate max-w-[100px]" title={name}>{name}</span>
                 </div>
                 <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{count}</span>
@@ -175,7 +175,7 @@
                 setProgress(0);
             };
 
-            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V29) ---
+            // --- LOGIKA PEMBERSIHAN & EXTRAKSI (DIPERBAIKI V32) ---
             const cleanResiString = (resi, provider) => {
                 if (!resi) return null;
                 
@@ -187,12 +187,15 @@
                     if (idx > 5) clean = clean.substring(0, idx);
                 });
 
+                // FIX V30: Hapus dash untuk Pos Indonesia agar sesuai "OID80..."
+                if (provider === 'Pos Indonesia') {
+                    clean = clean.replace(/-/g, '');
+                }
+
                 if (provider === 'Lazada Express') {
                     if (clean.startsWith('LXAD') && !clean.includes('-')) {
                         clean = clean.replace('LXAD', 'LXAD-');
                     }
-                    
-                    // FIX V28: Lazada LXAD limit
                     if (clean.startsWith('LXAD')) {
                          if (clean.length > 15) clean = clean.substring(0, 15);
                     } else {
@@ -200,13 +203,10 @@
                     }
                 }
 
-                // FIX V29: Tambahan Logic untuk NLID (Ninja Van via Lazada)
                 if (provider === 'Ninja Van') {
-                    // Jika diawali NJV atau NLID, potong paksa ke 16 karakter
                     if (clean.startsWith('NJV') || clean.startsWith('NLID')) {
                         if (clean.length > 16) clean = clean.substring(0, 16);
                     } else {
-                        // Default Ninja lainnya
                         if (clean.length > 18) clean = clean.substring(0, 18);
                     }
                 }
@@ -228,6 +228,13 @@
                 return /LION\s*PARCEL|REGPACK|ONEPACK|JAGOPACK|INTERPACK/.test(fullText.toUpperCase());
             };
 
+            // FIX V32: Validasi halaman khusus Pos Indonesia (Diperkuat)
+            const isValidPosPage = (fullText) => {
+                const upper = fullText.toUpperCase();
+                // Menambahkan 'POS IND' dan 'POS KILAT' untuk cover variasi label KiriminAja
+                return upper.includes('POS INDONESIA') || upper.includes('POS IND') || upper.includes('POS KILAT') || upper.includes('POS EXPRESS');
+            };
+
             const isValidInstantPage = (fullText) => {
                 const text = fullText.toUpperCase();
                 const instantKeywords = ["INSTANT", "SAMEDAY", "GOJEK", "GRAB", "GOSEND", "GRABEXPRESS", "SHOPEE EXPRESS INSTANT", "TOKOPEDIA"];
@@ -235,6 +242,7 @@
             };
 
             const detectTypeFromResi = (cleanResi) => {
+                if (cleanResi.startsWith("OID")) return "Pos Indonesia";
                 if (cleanResi.startsWith("LXAD")) return "Lazada Express"; 
                 if (cleanResi.startsWith("GTL")) return "GTL";
                 if (cleanResi.startsWith("SPX")) return "SPX Express";
@@ -318,31 +326,42 @@
 
                                 // --- PATTERNS ---
                                 const standardPatterns = [
+                                    // FIX V32: OID ditaruh PALING ATAS TAPI WAJIB LULUS VALIDASI HALAMAN POS
+                                    // Ini mencegah OID diambil oleh J&T (validasi gagal -> lanjut ke bawah)
+                                    // Tapi memastikan OID diambil DULUAN daripada SiCepat jika itu halaman Pos (validasi sukses -> ambil)
+                                    { regex: /OID-?[0-9]{10,25}/gi, type: 'Pos Indonesia' },
+
                                     { regex: /LXAD-?[0-9]{10,20}/gi, type: 'Lazada Express' },
                                     { regex: /(JX|JP|JO|EZ|JS|JT)[0-9]{10,20}/gi, type: 'J&T Express' },
                                     { regex: /C1[A-Z0-9]{6,15}/gi, type: 'Lion Parcel' },
                                     { regex: /GTL[0-9]{10,20}/gi, type: 'GTL' },
                                     { regex: /SPXID[A-Z0-9]{10,30}/gi, type: 'SPX Express' },
-                                    
-                                    // FIX V27: Memisahkan Regex Ninja Van
                                     { regex: /NJV[A-Z0-9]{13}/gi, type: 'Ninja Van' },
                                     { regex: /(KRMJAOID|NLID)[A-Z0-9]{10,30}/gi, type: 'Ninja Van' },
-                                    
                                     { regex: /(CM|KAJ|TJP)[0-9]{10,20}/gi, type: 'JNE' },
                                     { regex: /(IDE|IDS)[0-9]{10,20}/gi, type: 'ID Express' }, 
                                     { regex: /1000[0-9]{9,15}/gi, type: 'Anteraja' },
+                                    
+                                    // SiCepat Paling Bawah karena polanya sangat umum (hanya angka)
                                     { regex: /00[0-9]{10}/gi, type: 'SiCepat' } 
                                 ];
 
                                 for (let p of standardPatterns) {
                                     const matches = compactedText.match(p.regex);
                                     if (matches) {
+                                        // Validasi Halaman Khusus Lion
                                         if (p.type === 'Lion Parcel' && !isValidLionPage(rawTextStr)) continue;
+                                        
+                                        // FIX V32: Validasi Halaman Pos Indonesia (CRITICAL)
+                                        // Jika ketemu OID, CEK DULU apakah ini halaman Pos.
+                                        // Jika BUKAN halaman Pos (misal J&T), SKIP OID ini biar ditangkap regex J&T di bawahnya.
+                                        if (p.type === 'Pos Indonesia' && !isValidPosPage(rawTextStr)) continue;
+
                                         const bestMatch = matches.reduce((a, b) => a.length > b.length ? a : b);
                                         const finalResi = cleanResiString(bestMatch, p.type);
                                         if (finalResi) {
                                             foundResi = { resi: finalResi, type: p.type, fileName: file.name, page: i, source: "Text" };
-                                            break; 
+                                            break; // Ketemu & Valid -> Stop loop patterns
                                         }
                                     }
                                 }
@@ -380,7 +399,6 @@
                                         }
 
                                         if (rawCode) {
-                                            // Pre-clean untuk deteksi tipe
                                             let cleanCode = rawCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
                                             const tokpedMatch = cleanCode.match(/58[0-9]{16,}/);
                                             if (tokpedMatch) cleanCode = tokpedMatch[0];
@@ -392,6 +410,8 @@
                                                 let isValid = true;
                                                 if (detectedType.includes('Instant') && !isValidInstantPage(rawTextStr)) isValid = false;
                                                 if (detectedType === 'Lion Parcel' && !isValidLionPage(rawTextStr)) isValid = false;
+                                                // FIX V32: Validasi Barcode Pos juga
+                                                if (detectedType === 'Pos Indonesia' && !isValidPosPage(rawTextStr)) isValid = false;
 
                                                 if (isValid) {
                                                     const finalScan = cleanResiString(cleanCode, detectedType);
@@ -406,7 +426,6 @@
 
                                 // Finalisasi Per Halaman
                                 if (foundResi) {
-                                    // FIX V25: Case Insensitive & Lebih Agresif
                                     const pageTextUpper = rawTextStr.toUpperCase();
                                     
                                     if (foundResi.type === 'Ninja Van') {
@@ -417,7 +436,6 @@
                                             pageTextUpper.includes('LOGISTIK')
                                         ) {
                                             foundResi.type = 'Lazada Express';
-                                            // Re-clean sebagai Lazada untuk memastikan format LXAD-
                                             foundResi.resi = cleanResiString(foundResi.resi, 'Lazada Express');
                                         }
                                     }
@@ -506,7 +524,7 @@
                             </div>
                         </h1>
                         <div className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                            V29 (Fix NLID Length)
+                            V32 (Fix Akurasi Pos)
                         </div>
                     </nav>
 
